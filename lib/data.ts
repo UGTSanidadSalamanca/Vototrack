@@ -82,20 +82,29 @@ export const voterService = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    // 1. Intentar obtener de LocalStorage (usuarios creados manualmente)
+    const userMap = new Map<string, User>();
+
+    // 1. Empezar siempre con los mockUsers como base segura
+    mockUsers.forEach(u => userMap.set(u.username.toLowerCase(), u));
+
+    // 2. Intentar obtener de LocalStorage (usuarios creados manualmente por el admin)
     try {
       const savedUsers = window.localStorage.getItem('voto-track-managed-users');
       if (savedUsers) {
         const parsedUsers = JSON.parse(savedUsers);
-        if (Array.isArray(parsedUsers) && parsedUsers.length > 0) {
-          return parsedUsers;
+        if (Array.isArray(parsedUsers)) {
+          parsedUsers.forEach(u => {
+            if (u && typeof u.username === 'string') {
+              userMap.set(u.username.toLowerCase(), u);
+            }
+          });
         }
       }
     } catch (e) {
       console.error("Error reading localStorage users", e);
     }
 
-    // 2. Intentar obtener de la API
+    // 3. Intentar obtener de la API e integrarlos
     try {
       const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, {
         method: 'GET',
@@ -103,14 +112,19 @@ export const voterService = {
       });
       if (response.ok) {
         const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) {
+          data.forEach(u => {
+            if (u && typeof u.username === 'string') {
+              userMap.set(u.username.toLowerCase(), u);
+            }
+          });
+        }
       }
     } catch (error) {
-      console.warn("Error fetching users from API, using mock users:", error);
+      console.warn("Error fetching users from API:", error);
     }
 
-    // 3. Fallback a mockUsers
-    return mockUsers;
+    return Array.from(userMap.values());
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
