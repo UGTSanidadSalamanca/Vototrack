@@ -60,11 +60,11 @@ export const voterService = {
         method: 'GET',
         redirect: 'follow',
       });
-      
+
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
+
       const data = await response.json();
-      
+
       if (Array.isArray(data)) {
         return data.map((v: any) => ({
           ...v,
@@ -135,7 +135,7 @@ export const voterService = {
         method: 'POST',
         mode: 'no-cors',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           action: 'updateVote',
@@ -153,6 +153,49 @@ export const voterService = {
     }
   },
 
+  addUser: async (user: User): Promise<{ success: boolean; message?: string }> => {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'createUser',
+          username: user.username,
+          password: user.password,
+          role: user.role,
+          center: user.center
+        })
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error adding user:", error);
+      return { success: false };
+    }
+  },
+
+  deleteUser: async (username: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'deleteUser',
+          username: username
+        })
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return { success: false };
+    }
+  },
+
   sendReminder: async (voterId: number): Promise<{ success: boolean }> => {
     alert(`Recordatorio enviado al votante ID: ${voterId}`);
     return { success: true };
@@ -163,3 +206,4 @@ export const voterService = {
     return { success: true };
   }
 };
+
