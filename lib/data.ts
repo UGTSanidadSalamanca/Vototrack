@@ -58,7 +58,7 @@ export const voterService = {
       const response = await fetch(`${API_URL}?op=voters`);
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
-      return data;
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error("Error fetching voters:", error);
       return [];
@@ -70,7 +70,7 @@ export const voterService = {
       const response = await fetch(`${API_URL}?op=users`);
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
-      return data;
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error("Error fetching users:", error);
       return [];
