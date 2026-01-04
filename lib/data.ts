@@ -50,81 +50,31 @@ export const mockVoters: Voter[] = [
   }
 ];
 
-// URL de la API de Google Apps Script
 const API_URL = "https://script.google.com/macros/s/AKfycbz0i7LAhiMDU3FZEahkU9wt_SjcYPQVeJvTQ356R00BQdEz2PzpdNfnAYbA_t4ZUeBZ/exec";
 
 export const voterService = {
   getVoters: async (): Promise<Voter[]> => {
     try {
-      const response = await fetch(`${API_URL}?t=${Date.now()}`, {
-        method: 'GET',
-        redirect: 'follow',
-      });
-      
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
+      const response = await fetch(`${API_URL}?op=voters`);
+      if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
-      
-      if (Array.isArray(data)) {
-        return data.map((v: any) => ({
-          ...v,
-          id: Number(v.id),
-          afiliadoUGT: v.afiliadoUGT === true || String(v.afiliadoUGT).toUpperCase() === "TRUE",
-          haVotado: v.haVotado === true || String(v.haVotado).toUpperCase() === "TRUE",
-          horaVoto: v.horaVoto || null
-        }));
-      }
-      return mockVoters;
+      return data;
     } catch (error) {
-      console.error("Error fetching voters (falling back to mock):", error);
-      return mockVoters;
+      console.error("Error fetching voters:", error);
+      return [];
     }
   },
 
   getUsers: async (): Promise<User[]> => {
-    const userMap = new Map<string, User>();
-
-    // 1. Empezar siempre con los mockUsers como base segura
-    mockUsers.forEach(u => userMap.set(u.username.toLowerCase(), u));
-
-    // 2. Intentar obtener de LocalStorage (usuarios creados manualmente por el admin)
     try {
-      const savedUsers = window.localStorage.getItem('voto-track-managed-users');
-      if (savedUsers) {
-        const parsedUsers = JSON.parse(savedUsers);
-        if (Array.isArray(parsedUsers)) {
-          parsedUsers.forEach(u => {
-            if (u && typeof u.username === 'string') {
-              userMap.set(u.username.toLowerCase(), u);
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Error reading localStorage users", e);
-    }
-
-    // 3. Intentar obtener de la API e integrarlos
-    try {
-      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, {
-        method: 'GET',
-        redirect: 'follow',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          data.forEach(u => {
-            if (u && typeof u.username === 'string') {
-              userMap.set(u.username.toLowerCase(), u);
-            }
-          });
-        }
-      }
+      const response = await fetch(`${API_URL}?op=users`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      return data;
     } catch (error) {
-      console.warn("Error fetching users from API:", error);
+      console.error("Error fetching users:", error);
+      return [];
     }
-
-    return Array.from(userMap.values());
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
@@ -135,15 +85,13 @@ export const voterService = {
         method: 'POST',
         mode: 'no-cors',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'updateVote',
           id: voterId,
           haVotado: hasVoted,
           horaVoto: hora
-        }),
-        redirect: 'follow'
+        })
       });
 
       return { success: true, horaVoto: hora };
