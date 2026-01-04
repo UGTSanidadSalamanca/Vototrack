@@ -50,21 +50,84 @@ export const mockVoters: Voter[] = [
   }
 ];
 
+// URL de la API de Google Apps Script
+const API_URL = "https://script.google.com/macros/s/AKfycbz0i7LAhiMDU3FZEahkU9wt_SjcYPQVeJvTQ356R00BQdEz2PzpdNfnAYbA_t4ZUeBZ/exec";
+
 export const voterService = {
   getVoters: async (): Promise<Voter[]> => {
-    // Simulamos una pequeña carga local
-    return new Promise((resolve) => {
-      setTimeout(() => resolve(mockVoters), 300);
-    });
+    try {
+      // Añadimos un timestamp para evitar que el navegador use una respuesta cacheada con error
+      const response = await fetch(`${API_URL}?t=${Date.now()}`, {
+        method: 'GET',
+        redirect: 'follow', // Vital para Google Apps Script
+      });
+      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
+      const data = await response.json();
+      
+      // Validamos y transformamos los datos para asegurar tipos correctos
+      if (Array.isArray(data)) {
+        return data.map((v: any) => ({
+          ...v,
+          id: Number(v.id),
+          afiliadoUGT: v.afiliadoUGT === true || String(v.afiliadoUGT).toUpperCase() === "TRUE",
+          haVotado: v.haVotado === true || String(v.haVotado).toUpperCase() === "TRUE",
+          horaVoto: v.horaVoto || null
+        }));
+      }
+      return mockVoters;
+    } catch (error) {
+      console.error("Error fetching voters (falling back to mock):", error);
+      // Si falla la red o hay error de CORS, devolvemos los datos locales para que la app funcione
+      return mockVoters;
+    }
   },
 
   getUsers: async (): Promise<User[]> => {
+    try {
+      // Intentamos obtener usuarios si la API lo soporta (pasando un parámetro de acción)
+      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, {
+        method: 'GET',
+        redirect: 'follow',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    } catch (error) {
+      console.warn("Error fetching users from API, using mock users:", error);
+    }
     return mockUsers;
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
     const hora = hasVoted ? new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : null;
-    return { success: true, horaVoto: hora };
+
+    try {
+      // Usamos 'text/plain' para evitar el preflight de CORS (OPTIONS) que Google Apps Script a veces rechaza.
+      // El script en el servidor debe leer e.postData.contents.
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Evita bloqueos de CORS en el envío, aunque no permite leer la respuesta
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          action: 'updateVote',
+          id: voterId,
+          haVotado: hasVoted,
+          horaVoto: hora
+        }),
+        redirect: 'follow'
+      });
+
+      // Retornamos éxito de forma optimista ya que con 'no-cors' no podemos verificar el JSON de respuesta
+      return { success: true, horaVoto: hora };
+    } catch (error) {
+      console.error("Error updating voter status:", error);
+      return { success: false, horaVoto: null };
+    }
   },
 
   sendReminder: async (voterId: number): Promise<{ success: boolean }> => {
