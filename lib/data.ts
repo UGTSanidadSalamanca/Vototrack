@@ -82,49 +82,15 @@ export const voterService = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    const userMap = new Map<string, User>();
-
-    // 1. Empezar siempre con los mockUsers como base segura
-    mockUsers.forEach(u => userMap.set(u.username.toLowerCase(), u));
-
-    // 2. Intentar obtener de LocalStorage (usuarios creados manualmente por el admin)
     try {
-      const savedUsers = window.localStorage.getItem('voto-track-managed-users');
-      if (savedUsers) {
-        const parsedUsers = JSON.parse(savedUsers);
-        if (Array.isArray(parsedUsers)) {
-          parsedUsers.forEach(u => {
-            if (u && typeof u.username === 'string') {
-              userMap.set(u.username.toLowerCase(), u);
-            }
-          });
-        }
-      }
-    } catch (e) {
-      console.error("Error reading localStorage users", e);
-    }
-
-    // 3. Intentar obtener de la API e integrarlos
-    try {
-      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, {
-        method: 'GET',
-        redirect: 'follow',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          data.forEach(u => {
-            if (u && typeof u.username === 'string') {
-              userMap.set(u.username.toLowerCase(), u);
-            }
-          });
-        }
-      }
+      const response = await fetch(`${API_URL}?op=users&t=${Date.now()}`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.warn("Error fetching users from API:", error);
+      console.error("Error fetching users:", error);
+      return [];
     }
-
-    return Array.from(userMap.values());
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
