@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/Card';
 import { Input } from './ui/Input';
@@ -7,19 +7,32 @@ import { Button } from './ui/Button';
 import { Select } from './ui/Select';
 import { Badge } from './ui/Badge';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { mockUsers, VOTING_CENTERS } from '../lib/data';
+import { mockUsers, VOTING_CENTERS, voterService } from '../lib/data';
 import { UserPlus, Trash2, Shield, MapPin } from 'lucide-react';
 
 const UserManagement: React.FC = () => {
-  const [users, setUsers] = useLocalStorage<User[]>('voto-track-managed-users', mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentUser] = useLocalStorage<User | null>('voto-track-user', null);
-  
+
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<'admin' | 'mesa'>('mesa');
   const [newCenter, setNewCenter] = useState(VOTING_CENTERS[0]);
 
-  const handleAddUser = (e: React.FormEvent) => {
+  // Load users from API on mount
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setIsLoading(true);
+    const apiUsers = await voterService.getUsers();
+    setUsers(apiUsers);
+    setIsLoading(false);
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUsername || !newPassword) return;
 
@@ -35,18 +48,35 @@ const UserManagement: React.FC = () => {
       center: newRole === 'admin' ? 'Todos' : newCenter,
     };
 
+    // Optimistic update
     setUsers([...users, newUser]);
-    setNewUsername('');
-    setNewPassword('');
+
+    // API call
+    const result = await voterService.addUser(newUser);
+    if (!result.success) {
+      alert('Error al guardar en Google Sheets. Verifique la conexión.');
+      // Revert optimism if failed (optional, but good practice)
+      loadUsers();
+    } else {
+      setNewUsername('');
+      setNewPassword('');
+    }
   };
 
-  const handleDeleteUser = (username: string) => {
+  const handleDeleteUser = async (username: string) => {
     if (username === currentUser?.username) {
       alert('No puedes eliminar tu propia cuenta de administrador.');
       return;
     }
     if (confirm(`¿Estás seguro de que quieres eliminar al usuario ${username}?`)) {
+      // Optimistic update
       setUsers(users.filter(u => u.username !== username));
+
+      const result = await voterService.deleteUser(username);
+      if (!result.success) {
+        alert('Error al eliminar en Google Sheets.');
+        loadUsers();
+      }
     }
   };
 
@@ -64,21 +94,21 @@ const UserManagement: React.FC = () => {
           <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
             <div className="space-y-1">
               <label className="text-xs text-gray-400">Usuario</label>
-              <Input 
-                placeholder="Nombre de usuario" 
-                value={newUsername} 
-                onChange={(e) => setNewUsername(e.target.value)} 
-                required 
+              <Input
+                placeholder="Nombre de usuario"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-gray-400">Contraseña</label>
-              <Input 
-                type="password" 
-                placeholder="Contraseña" 
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)} 
-                required 
+              <Input
+                type="password"
+                placeholder="Contraseña"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-1">
@@ -90,9 +120,9 @@ const UserManagement: React.FC = () => {
             </div>
             <div className="space-y-1">
               <label className="text-xs text-gray-400">Centro</label>
-              <Select 
-                value={newCenter} 
-                onChange={(e) => setNewCenter(e.target.value)} 
+              <Select
+                value={newCenter}
+                onChange={(e) => setNewCenter(e.target.value)}
                 disabled={newRole === 'admin'}
               >
                 {newRole === 'admin' ? (
@@ -142,9 +172,9 @@ const UserManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
                         onClick={() => handleDeleteUser(u.username)}
                       >

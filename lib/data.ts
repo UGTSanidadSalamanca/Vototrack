@@ -88,6 +88,7 @@ export const voterService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          action: 'updateVote',
           id: voterId,
           haVotado: hasVoted,
           horaVoto: hora
@@ -98,6 +99,49 @@ export const voterService = {
     } catch (error) {
       console.error("Error updating voter status:", error);
       return { success: false, horaVoto: null };
+    }
+  },
+
+  addUser: async (user: User): Promise<{ success: boolean; message?: string }> => {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'createUser',
+          username: user.username,
+          password: user.password,
+          role: user.role,
+          center: user.center
+        })
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error adding user:", error);
+      return { success: false };
+    }
+  },
+
+  deleteUser: async (username: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      await fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'deleteUser',
+          username: username
+        })
+      });
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return { success: false };
     }
   },
 
