@@ -60,11 +60,11 @@ export const voterService = {
         method: 'GET',
         redirect: 'follow',
       });
-
+      
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
+      
       const data = await response.json();
-
+      
       if (Array.isArray(data)) {
         return data.map((v: any) => ({
           ...v,
@@ -82,15 +82,49 @@ export const voterService = {
   },
 
   getUsers: async (): Promise<User[]> => {
+    const userMap = new Map<string, User>();
+
+    // 1. Empezar siempre con los mockUsers como base segura
+    mockUsers.forEach(u => userMap.set(u.username.toLowerCase(), u));
+
+    // 2. Intentar obtener de LocalStorage (usuarios creados manualmente por el admin)
     try {
-      const response = await fetch(`${API_URL}?op=users&t=${Date.now()}`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      return [];
+      const savedUsers = window.localStorage.getItem('voto-track-managed-users');
+      if (savedUsers) {
+        const parsedUsers = JSON.parse(savedUsers);
+        if (Array.isArray(parsedUsers)) {
+          parsedUsers.forEach(u => {
+            if (u && typeof u.username === 'string') {
+              userMap.set(u.username.toLowerCase(), u);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Error reading localStorage users", e);
     }
+
+    // 3. Intentar obtener de la API e integrarlos
+    try {
+      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, {
+        method: 'GET',
+        redirect: 'follow',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          data.forEach(u => {
+            if (u && typeof u.username === 'string') {
+              userMap.set(u.username.toLowerCase(), u);
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.warn("Error fetching users from API:", error);
+    }
+
+    return Array.from(userMap.values());
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
@@ -101,7 +135,7 @@ export const voterService = {
         method: 'POST',
         mode: 'no-cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify({
           action: 'updateVote',
@@ -119,49 +153,6 @@ export const voterService = {
     }
   },
 
-  addUser: async (user: User): Promise<{ success: boolean; message?: string }> => {
-    try {
-      await fetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'createUser',
-          username: user.username,
-          password: user.password,
-          role: user.role,
-          center: user.center
-        })
-      });
-      return { success: true };
-    } catch (error) {
-      console.error("Error adding user:", error);
-      return { success: false };
-    }
-  },
-
-  deleteUser: async (username: string): Promise<{ success: boolean; message?: string }> => {
-    try {
-      await fetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'deleteUser',
-          username: username
-        })
-      });
-      return { success: true };
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      return { success: false };
-    }
-  },
-
   sendReminder: async (voterId: number): Promise<{ success: boolean }> => {
     alert(`Recordatorio enviado al votante ID: ${voterId}`);
     return { success: true };
@@ -172,4 +163,3 @@ export const voterService = {
     return { success: true };
   }
 };
-

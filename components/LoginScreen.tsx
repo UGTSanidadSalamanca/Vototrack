@@ -65,7 +65,9 @@ const LoginScreen: React.FC = () => {
               {isLoading ? 'Accediendo...' : 'Iniciar Sesión'}
             </Button>
           </form>
-
+          <div className="mt-4 text-xs text-center text-gray-500">
+            Prueba con admin / password
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -73,4 +75,3 @@ const LoginScreen: React.FC = () => {
 };
 
 export default LoginScreen;
-// VotoTrack Login V1.1
