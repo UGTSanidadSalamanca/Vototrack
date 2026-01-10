@@ -12,12 +12,15 @@ import { AuthContext } from '../context/AuthContext';
 import { Button } from './ui/Button';
 import { Users, UserCog, Loader2 } from 'lucide-react';
 
-const normalizeText = (text: string) => {
-  if (!text) return "";
-  return text
+// Función de normalización ultra defensiva
+const normalizeText = (text: any): string => {
+  if (text === null || text === undefined) return "";
+  const stringified = String(text);
+  return stringified
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+    .toLowerCase()
+    .trim();
 };
 
 const AuthenticatedApp: React.FC = () => {
@@ -37,7 +40,7 @@ const AuthenticatedApp: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       const data = await voterService.getVoters();
-      setAllVoters(data);
+      setAllVoters(data || []);
       setIsLoading(false);
     };
     loadData();
@@ -55,35 +58,43 @@ const AuthenticatedApp: React.FC = () => {
   }, []);
 
   const votersForUser = useMemo(() => {
+    if (!Array.isArray(allVoters)) return [];
     if (currentUser.role === 'mesa') {
-        return allVoters.filter(v => v.centroVotacion === currentUser.center);
+        return allVoters.filter(v => v && v.centroVotacion === currentUser.center);
     }
-    return allVoters;
+    return allVoters.filter(v => !!v);
   }, [allVoters, currentUser]);
 
   const filteredVoters = useMemo(() => {
+    const normalizedSearch = normalizeText(searchTerm);
+
     return votersForUser
       .filter(voter => {
-        const normalizedSearch = normalizeText(searchTerm);
+        if (!voter) return false;
+        if (!normalizedSearch) return true;
+        
         return (
           normalizeText(voter.nombre).includes(normalizedSearch) ||
           normalizeText(voter.apellido).includes(normalizedSearch) ||
           normalizeText(voter.apellido2).includes(normalizedSearch) ||
           normalizeText(voter.email).includes(normalizedSearch) ||
-          voter.telefono.includes(normalizedSearch)
+          normalizeText(voter.telefono).includes(normalizedSearch)
         );
       })
       .filter(voter => {
+        if (!voter) return false;
         if (affiliationFilter === 'afiliados') return voter.afiliadoUGT;
         if (affiliationFilter === 'no_afiliados') return !voter.afiliadoUGT;
         return true;
       })
       .filter(voter => {
+        if (!voter) return false;
         if (voteStatusFilter === 'votado') return voter.haVotado;
         if (voteStatusFilter === 'no_votado') return !voter.haVotado;
         return true;
       })
       .filter(voter => {
+        if (!voter) return false;
         if (currentUser.role === 'admin' && centerFilter !== 'todos') {
             return voter.centroVotacion === centerFilter;
         }
@@ -94,7 +105,7 @@ const AuthenticatedApp: React.FC = () => {
   const votingCenters = useMemo(() => ['todos', ...VOTING_CENTERS], []);
 
   const totalVoters = votersForUser.length;
-  const votersWhoVoted = votersForUser.filter(v => v.haVotado).length;
+  const votersWhoVoted = votersForUser.filter(v => v && v.haVotado).length;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -124,7 +135,7 @@ const AuthenticatedApp: React.FC = () => {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="w-12 h-12 text-primary animate-spin" />
-            <p className="text-gray-400">Cargando datos locales...</p>
+            <p className="text-gray-400">Sincronizando con el censo real...</p>
         </div>
       ) : activeTab === 'voters' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

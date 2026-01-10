@@ -34,23 +34,9 @@ export const mockVoters: Voter[] = [
     horaVoto: '10:15',
     centroVotacion: 'Montalvos',
     mesaVotacion: 'Mesa B'
-  },
-  {
-    id: 3,
-    nombre: 'CARLOS',
-    apellido: 'SÁNCHEZ',
-    apellido2: 'MARTÍN',
-    telefono: '622333444',
-    email: 'c.sanchez@saludcastillayleon.es',
-    afiliadoUGT: true,
-    haVotado: false,
-    horaVoto: null,
-    centroVotacion: 'Hospital Béjar',
-    mesaVotacion: 'Mesa Única'
   }
 ];
 
-// URL de la API de Google Apps Script
 const API_URL = "https://script.google.com/macros/s/AKfycbz0i7LAhiMDU3FZEahkU9wt_SjcYPQVeJvTQ356R00BQdEz2PzpdNfnAYbA_t4ZUeBZ/exec";
 
 export const voterService = {
@@ -66,99 +52,84 @@ export const voterService = {
       const data = await response.json();
       
       if (Array.isArray(data)) {
-        return data.map((v: any) => ({
-          ...v,
-          id: Number(v.id),
-          afiliadoUGT: v.afiliadoUGT === true || String(v.afiliadoUGT).toUpperCase() === "TRUE",
-          haVotado: v.haVotado === true || String(v.haVotado).toUpperCase() === "TRUE",
-          horaVoto: v.horaVoto || null
-        }));
+        // Saneamiento profundo para evitar errores de búsqueda
+        return data
+          .filter(v => v && typeof v === 'object')
+          .map((v: any) => ({
+            id: Number(v.id || 0),
+            nombre: String(v.nombre || ""),
+            apellido: String(v.apellido || ""),
+            apellido2: String(v.apellido2 || ""),
+            telefono: String(v.telefono || ""),
+            email: String(v.email || ""),
+            afiliadoUGT: v.afiliadoUGT === true || String(v.afiliadoUGT).toLowerCase() === "true",
+            haVotado: v.haVotado === true || String(v.haVotado).toLowerCase() === "true",
+            horaVoto: v.horaVoto ? String(v.horaVoto) : null,
+            centroVotacion: String(v.centroVotacion || "No asignado"),
+            mesaVotacion: String(v.mesaVotacion || "Sin mesa")
+          }));
       }
       return mockVoters;
     } catch (error) {
-      console.error("Error fetching voters (falling back to mock):", error);
+      console.error("Error fetching voters:", error);
       return mockVoters;
     }
   },
 
   getUsers: async (): Promise<User[]> => {
     const userMap = new Map<string, User>();
-
-    // 1. Empezar siempre con los mockUsers como base segura
     mockUsers.forEach(u => userMap.set(u.username.toLowerCase(), u));
 
-    // 2. Intentar obtener de LocalStorage (usuarios creados manualmente por el admin)
     try {
       const savedUsers = window.localStorage.getItem('voto-track-managed-users');
       if (savedUsers) {
         const parsedUsers = JSON.parse(savedUsers);
         if (Array.isArray(parsedUsers)) {
           parsedUsers.forEach(u => {
-            if (u && typeof u.username === 'string') {
-              userMap.set(u.username.toLowerCase(), u);
-            }
+            if (u && typeof u.username === 'string') userMap.set(u.username.toLowerCase(), u);
           });
         }
       }
-    } catch (e) {
-      console.error("Error reading localStorage users", e);
-    }
+    } catch (e) { console.error(e); }
 
-    // 3. Intentar obtener de la API e integrarlos
     try {
-      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, {
-        method: 'GET',
-        redirect: 'follow',
-      });
+      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
           data.forEach(u => {
-            if (u && typeof u.username === 'string') {
-              userMap.set(u.username.toLowerCase(), u);
-            }
+            if (u && typeof u.username === 'string') userMap.set(u.username.toLowerCase(), u);
           });
         }
       }
-    } catch (error) {
-      console.warn("Error fetching users from API:", error);
-    }
+    } catch (error) { console.warn(error); }
 
     return Array.from(userMap.values());
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
     const hora = hasVoted ? new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : null;
-
     try {
       await fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify({
-          action: 'updateVote',
-          id: voterId,
-          haVotado: hasVoted,
-          horaVoto: hora
-        }),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'updateVote', id: voterId, haVotado: hasVoted, horaVoto: hora }),
         redirect: 'follow'
       });
-
       return { success: true, horaVoto: hora };
     } catch (error) {
-      console.error("Error updating voter status:", error);
+      console.error(error);
       return { success: false, horaVoto: null };
     }
   },
 
-  sendReminder: async (voterId: number): Promise<{ success: boolean }> => {
+  sendReminder: async (voterId: number) => {
     alert(`Recordatorio enviado al votante ID: ${voterId}`);
     return { success: true };
   },
 
-  sendMassReminder: async (voterIds: number[]): Promise<{ success: boolean }> => {
+  sendMassReminder: async (voterIds: number[]) => {
     alert(`Recordatorio masivo enviado a ${voterIds.length} afiliados.`);
     return { success: true };
   }
