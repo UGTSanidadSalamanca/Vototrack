@@ -8,11 +8,11 @@ import StatisticsCard from './StatisticsCard';
 import FilterControls from './FilterControls';
 import VoterList from './VoterList';
 import UserManagement from './UserManagement';
+import ElectionResults from './ElectionResults';
 import { AuthContext } from '../context/AuthContext';
 import { Button } from './ui/Button';
-import { Users, UserCog, Loader2 } from 'lucide-react';
+import { Users, UserCog, Loader2, BarChart4 } from 'lucide-react';
 
-// Función de normalización ultra defensiva
 const normalizeText = (text: any): string => {
   if (text === null || text === undefined) return "";
   const stringified = String(text);
@@ -27,7 +27,7 @@ const AuthenticatedApp: React.FC = () => {
   const auth = useContext(AuthContext);
   const currentUser = auth?.user as User;
 
-  const [activeTab, setActiveTab] = useState<'voters' | 'users'>('voters');
+  const [activeTab, setActiveTab] = useState<'voters' | 'users' | 'results'>('voters');
   const [allVoters, setAllVoters] = useState<Voter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -109,10 +109,12 @@ const AuthenticatedApp: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <Header />
+      <div className="no-print">
+        <Header />
+      </div>
 
       {currentUser.role === 'admin' && (
-        <div className="flex gap-2 bg-card p-1 border border-white/10 rounded-lg w-fit">
+        <div className="flex gap-2 bg-card p-1 border border-white/10 rounded-lg w-fit no-print">
           <Button 
             variant={activeTab === 'voters' ? 'default' : 'ghost'} 
             size="sm"
@@ -120,6 +122,14 @@ const AuthenticatedApp: React.FC = () => {
           >
             <Users className="w-4 h-4 mr-2" />
             Votantes
+          </Button>
+          <Button 
+            variant={activeTab === 'results' ? 'default' : 'ghost'} 
+            size="sm"
+            onClick={() => setActiveTab('results')}
+          >
+            <BarChart4 className="w-4 h-4 mr-2" />
+            Escrutinio
           </Button>
           <Button 
             variant={activeTab === 'users' ? 'default' : 'ghost'} 
@@ -133,12 +143,12 @@ const AuthenticatedApp: React.FC = () => {
       )}
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="flex flex-col items-center justify-center py-20 gap-4 no-print">
             <Loader2 className="w-12 h-12 text-primary animate-spin" />
             <p className="text-gray-400">Sincronizando con el censo real...</p>
         </div>
       ) : activeTab === 'voters' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
           <aside className="lg:col-span-1 flex flex-col gap-6">
             <SummaryCard 
               totalVoters={totalVoters}
@@ -167,8 +177,12 @@ const AuthenticatedApp: React.FC = () => {
             />
           </main>
         </div>
+      ) : activeTab === 'results' ? (
+        <ElectionResults voters={allVoters} />
       ) : (
-        <UserManagement />
+        <div className="no-print">
+          <UserManagement />
+        </div>
       )}
     </div>
   );

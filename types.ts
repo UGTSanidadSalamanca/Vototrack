@@ -19,3 +19,24 @@ export interface User {
   role: 'admin' | 'mesa';
   center: string;
 }
+
+export interface UnionVotes {
+  union: string;
+  votes: number;
+}
+
+export interface ElectionData {
+  blankVotes: number;
+  nullVotes: number;
+  unionVotes: UnionVotes[];
+}
+
+export interface ElectionCalculation {
+  union: string;
+  votes: number;
+  percentage: number;
+  excluded: boolean;
+  initialSeats: number;
+  remainder: number;
+  finalSeats: number;
+}
