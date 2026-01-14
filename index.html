@@ -1,27 +1,44 @@
+
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VotoTrack</title>
+    <title>VotoTrack PRO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
       :root {
-        --background: 220 16% 12%;
-        --foreground: 210 20% 98%;
-        --card: 220 16% 18%;
-        --primary: 217 91% 60%;
-        --accent: 142 76% 36%;
+        --background: 222 47% 11%;
+        --foreground: 210 40% 98%;
+        --card: 222 47% 12%;
+        --primary: 217.2 91.2% 59.8%;
+        --accent: 142.1 70.6% 45.3%;
         --destructive: 0 84.2% 60.2%;
+        --primary-foreground: 210 40% 98%;
+        --accent-foreground: 210 40% 98%;
       }
       body {
         font-family: 'Inter', sans-serif;
         background-color: hsl(var(--background));
         color: hsl(var(--foreground));
+      }
+      
+      /* Reset para impresión: siempre blanco */
+      @media print {
+        :root {
+          --background: 0 0% 100%;
+          --foreground: 0 0% 0%;
+          --card: 0 0% 100%;
+        }
+        body { 
+          background-color: white !important; 
+          color: black !important;
+        }
+        .no-print { display: none !important; }
       }
     </style>
      <script>

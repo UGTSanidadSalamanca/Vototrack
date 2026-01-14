@@ -29,6 +29,7 @@ export interface ElectionData {
   blankVotes: number;
   nullVotes: number;
   unionVotes: UnionVotes[];
+  totalSeats: number;
 }
 
 export interface ElectionCalculation {
