@@ -12,18 +12,17 @@ interface ElectionResultsProps {
 }
 
 const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
-    // Valores ficticios para demostración inmediata
+    // Valores de ejemplo actualizados para los nuevos sindicatos
     const DEFAULT_VOTES = {
-        'SATSE': 240,
-        'CSIF': 210,
-        'CESM-TISCYL': 190,
         'UGT': 150,
         'CCOO': 120,
-        'USAIE-SAE': 105,
-        'TCAE-CAUSA': 95,
+        'CSIF': 210,
         'CGT': 85,
-        'USCAL': 75,
-        'ASPES': 70
+        'SATSE': 240,
+        'SAE': 105,
+        'TCAE CAUSA': 95,
+        'CEMS': 190,
+        'CTS': 75
     };
 
     const [electionData, setElectionData] = useState<ElectionData>(() => {

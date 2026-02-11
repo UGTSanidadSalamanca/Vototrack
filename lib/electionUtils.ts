@@ -2,8 +2,7 @@
 import { ElectionData, ElectionCalculation } from '../types';
 
 export const UNIONS = [
-  'SATSE', 'CSIF', 'CESM-TISCYL', 'USAIE-SAE', 'UGT', 
-  'CCOO', 'TCAE-CAUSA', 'CGT', 'USCAL', 'ASPES'
+  'UGT', 'CCOO', 'CSIF', 'CGT', 'SATSE', 'SAE', 'TCAE CAUSA', 'CEMS', 'CTS'
 ];
 
 export const calculateElectionResults = (data: ElectionData, totalSeats: number = 35): ElectionCalculation[] => {
@@ -45,18 +44,7 @@ export const calculateElectionResults = (data: ElectionData, totalSeats: number 
   // 3. Reparto por Restos Mayores
   let remainingSeats = totalSeats - allocatedSeats;
   
-  while (remainingSeats > 0) {
-    const winner = results
-      .filter(r => !r.excluded)
-      .sort((a, b) => b.remainder - a.remainder)
-      .find(r => {
-          // Buscamos al primero que no haya recibido un asiento extra en esta fase de restos
-          // En una vuelta simple de restos mayores cada uno solo puede recibir 1 max
-          return true; 
-      });
-
-    // Nota: El algoritmo estándar de restos mayores ordena por el resto de la división
-    // y reparte 1 a cada uno hasta agotar los asientos sobrantes.
+  if (remainingSeats > 0) {
     const sortedByRemainder = [...results]
         .filter(r => !r.excluded)
         .sort((a, b) => b.remainder - a.remainder);
@@ -67,7 +55,6 @@ export const calculateElectionResults = (data: ElectionData, totalSeats: number 
             r.union === unionToUpdate ? { ...r, finalSeats: r.finalSeats + 1 } : r
         );
     }
-    remainingSeats = 0;
   }
 
   return results;
