@@ -12,7 +12,7 @@ interface ElectionResultsProps {
 }
 
 const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
-    // Valores de ejemplo actualizados para los nuevos sindicatos
+    // Valores de ejemplo actualizados incluyendo el nuevo sindicato SINGEFE
     const DEFAULT_VOTES = {
         'UGT': 150,
         'CCOO': 120,
@@ -22,7 +22,8 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
         'SAE': 105,
         'TCAE CAUSA': 95,
         'CEMS': 190,
-        'CTS': 75
+        'CTS': 75,
+        'SINGEFE': 60
     };
 
     const [electionData, setElectionData] = useState<ElectionData>(() => {
