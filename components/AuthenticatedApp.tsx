@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useContext, useCallback, useEffect } from 'react';
-import { voterService, VOTING_CENTERS } from '../lib/data';
+import { voterService, VOTING_CENTERS, VOTING_TABLES } from '../lib/data';
 import { Voter, User } from '../types';
 import Header from './Header';
 import SummaryCard from './SummaryCard';
@@ -14,13 +14,8 @@ import { Button } from './ui/Button';
 import { Users, UserCog, Loader2, BarChart4 } from 'lucide-react';
 
 const normalizeText = (text: any): string => {
-  if (text === null || text === undefined) return "";
-  const stringified = String(text);
-  return stringified
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  if (!text) return "";
+  return String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 };
 
 const AuthenticatedApp: React.FC = () => {
@@ -34,154 +29,127 @@ const AuthenticatedApp: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [affiliationFilter, setAffiliationFilter] = useState('todos');
   const [voteStatusFilter, setVoteStatusFilter] = useState('todos');
-  const [centerFilter, setCenterFilter] = useState(currentUser.role === 'mesa' ? currentUser.center : 'todos');
   
+  // Si el usuario es de mesa, su filtro inicial es su mesa asignada. Si es admin, es 'todos'.
+  const [centerFilter, setCenterFilter] = useState(currentUser?.role === 'mesa' ? currentUser.center : 'todos');
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    const data = await voterService.getVoters();
+    setAllVoters(data);
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      const data = await voterService.getVoters();
-      setAllVoters(data || []);
-      setIsLoading(false);
-    };
-    loadData();
-  }, []);
+    fetchData();
+    const interval = setInterval(fetchData, 60000); 
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
-  const handleVoterStatusChange = useCallback(async (voterId: number, hasVoted: boolean) => {
-    const result = await voterService.updateVoterStatus(voterId, hasVoted);
-    if(result.success) {
-        setAllVoters(prevVoters => 
-            prevVoters.map(v => 
-                v.id === voterId ? { ...v, haVotado: hasVoted, horaVoto: result.horaVoto } : v
-            )
-        );
+  const handleStatusChange = async (voterId: number, hasVoted: boolean) => {
+    setAllVoters(prev => prev.map(v => v.id === voterId ? { ...v, haVotado: hasVoted, horaVoto: hasVoted ? '...' : null } : v));
+    const { success, horaVoto } = await voterService.updateVoterStatus(voterId, hasVoted);
+    if (success) {
+      setAllVoters(prev => prev.map(v => v.id === voterId ? { ...v, haVotado: hasVoted, horaVoto } : v));
+    } else {
+      fetchData(); 
     }
-  }, []);
-
-  const votersForUser = useMemo(() => {
-    if (!Array.isArray(allVoters)) return [];
-    if (currentUser.role === 'mesa') {
-        return allVoters.filter(v => v && v.centroVotacion === currentUser.center);
-    }
-    return allVoters.filter(v => !!v);
-  }, [allVoters, currentUser]);
+  };
 
   const filteredVoters = useMemo(() => {
-    const normalizedSearch = normalizeText(searchTerm);
+    return allVoters.filter(voter => {
+      // 1. Busqueda por texto (Nombre, Apellido o DNI)
+      const matchesSearch = !searchTerm || 
+        normalizeText(voter.nombre).includes(normalizeText(searchTerm)) ||
+        normalizeText(voter.apellido).includes(normalizeText(searchTerm)) ||
+        normalizeText(voter.apellido2).includes(normalizeText(searchTerm)) ||
+        normalizeText(voter.dni).includes(normalizeText(searchTerm));
 
-    return votersForUser
-      .filter(voter => {
-        if (!voter) return false;
-        if (!normalizedSearch) return true;
-        
-        return (
-          normalizeText(voter.nombre).includes(normalizedSearch) ||
-          normalizeText(voter.apellido).includes(normalizedSearch) ||
-          normalizeText(voter.apellido2).includes(normalizedSearch) ||
-          normalizeText(voter.email).includes(normalizedSearch) ||
-          normalizeText(voter.telefono).includes(normalizedSearch)
-        );
-      })
-      .filter(voter => {
-        if (!voter) return false;
-        if (affiliationFilter === 'afiliados') return voter.afiliadoUGT;
-        if (affiliationFilter === 'no_afiliados') return !voter.afiliadoUGT;
-        return true;
-      })
-      .filter(voter => {
-        if (!voter) return false;
-        if (voteStatusFilter === 'votado') return voter.haVotado;
-        if (voteStatusFilter === 'no_votado') return !voter.haVotado;
-        return true;
-      })
-      .filter(voter => {
-        if (!voter) return false;
-        if (currentUser.role === 'admin' && centerFilter !== 'todos') {
-            return voter.centroVotacion === centerFilter;
-        }
-        return true; 
-      });
-  }, [votersForUser, searchTerm, affiliationFilter, voteStatusFilter, centerFilter, currentUser.role]);
-  
-  const votingCenters = useMemo(() => ['todos', ...VOTING_CENTERS], []);
+      // 2. Filtro de afiliación
+      const matchesAffiliation = affiliationFilter === 'todos' || 
+        (affiliationFilter === 'afiliados' && voter.afiliadoUGT) ||
+        (affiliationFilter === 'no_afiliados' && !voter.afiliadoUGT);
 
-  const totalVoters = votersForUser.length;
-  const votersWhoVoted = votersForUser.filter(v => v && v.haVotado).length;
+      // 3. Filtro de estado de voto
+      const matchesVoteStatus = voteStatusFilter === 'todos' || 
+        (voteStatusFilter === 'votado' && voter.haVotado) ||
+        (voteStatusFilter === 'no_votado' && !voter.haVotado);
+
+      // 4. Lógica de Centro/Mesa combinada
+      const matchesCenter = centerFilter === 'todos' || 
+        voter.centroVotacion === centerFilter || 
+        voter.mesaVotacion === centerFilter;
+
+      return matchesSearch && matchesAffiliation && matchesVoteStatus && matchesCenter;
+    });
+  }, [allVoters, searchTerm, affiliationFilter, voteStatusFilter, centerFilter]);
+
+  const stats = useMemo(() => {
+    const total = filteredVoters.length;
+    const voted = filteredVoters.filter(v => v.haVotado).length;
+    return { total, voted };
+  }, [filteredVoters]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="no-print">
-        <Header />
+    <div className="max-w-7xl mx-auto p-4 space-y-6">
+      <Header />
+
+      <div className="flex flex-wrap gap-2 no-print">
+        <Button 
+          variant={activeTab === 'voters' ? 'default' : 'outline'} 
+          onClick={() => setActiveTab('voters')} 
+          className="gap-2"
+        >
+          <Users className="w-4 h-4" /> Seguimiento
+        </Button>
+        {currentUser.role === 'admin' && (
+          <>
+            <Button 
+              variant={activeTab === 'users' ? 'default' : 'outline'} 
+              onClick={() => setActiveTab('users')} 
+              className="gap-2"
+            >
+              <UserCog className="w-4 h-4" /> Accesos
+            </Button>
+            <Button 
+              variant={activeTab === 'results' ? 'default' : 'outline'} 
+              onClick={() => setActiveTab('results')} 
+              className="gap-2"
+            >
+              <BarChart4 className="w-4 h-4" /> Escrutinio
+            </Button>
+          </>
+        )}
       </div>
 
-      {currentUser.role === 'admin' && (
-        <div className="flex gap-2 bg-card p-1 border border-white/10 rounded-lg w-fit no-print">
-          <Button 
-            variant={activeTab === 'voters' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('voters')}
-          >
-            <Users className="w-4 h-4 mr-2" />
-            Votantes
-          </Button>
-          <Button 
-            variant={activeTab === 'results' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('results')}
-          >
-            <BarChart4 className="w-4 h-4 mr-2" />
-            Escrutinio
-          </Button>
-          <Button 
-            variant={activeTab === 'users' ? 'default' : 'ghost'} 
-            size="sm"
-            onClick={() => setActiveTab('users')}
-          >
-            <UserCog className="w-4 h-4 mr-2" />
-            Usuarios
-          </Button>
+      {isLoading && allVoters.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <p className="text-gray-400">Accediendo a Hoja 1 y Usuarios...</p>
         </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 no-print">
-            <Loader2 className="w-12 h-12 text-primary animate-spin" />
-            <p className="text-gray-400">Sincronizando con el censo real...</p>
-        </div>
-      ) : activeTab === 'voters' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
-          <aside className="lg:col-span-1 flex flex-col gap-6">
-            <SummaryCard 
-              totalVoters={totalVoters}
-              votersWhoVoted={votersWhoVoted}
-            />
-            <StatisticsCard voters={votersForUser} />
-          </aside>
-
-          <main className="lg:col-span-2 flex flex-col gap-6">
-            <FilterControls
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-                affiliationFilter={affiliationFilter}
-                setAffiliationFilter={setAffiliationFilter}
-                voteStatusFilter={voteStatusFilter}
-                setVoteStatusFilter={setVoteStatusFilter}
-                centerFilter={centerFilter}
-                setCenterFilter={setCenterFilter}
-                votingCenters={votingCenters}
-                user={currentUser}
-                filteredVoters={filteredVoters}
-            />
-            <VoterList 
-                voters={filteredVoters} 
-                onStatusChange={handleVoterStatusChange} 
-            />
-          </main>
-        </div>
-      ) : activeTab === 'results' ? (
-        <ElectionResults voters={allVoters} />
       ) : (
-        <div className="no-print">
-          <UserManagement />
+        <div className="space-y-6">
+          {activeTab === 'voters' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1 space-y-6">
+                <SummaryCard totalVoters={stats.total} votersWhoVoted={stats.voted} />
+                <StatisticsCard voters={filteredVoters} />
+              </div>
+              <div className="lg:col-span-2 space-y-6">
+                <FilterControls 
+                  searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+                  affiliationFilter={affiliationFilter} setAffiliationFilter={setAffiliationFilter}
+                  voteStatusFilter={voteStatusFilter} setVoteStatusFilter={setVoteStatusFilter}
+                  centerFilter={centerFilter} setCenterFilter={setCenterFilter}
+                  votingCenters={['todos', ...VOTING_CENTERS, ...VOTING_TABLES]}
+                  user={currentUser} filteredVoters={filteredVoters}
+                />
+                <VoterList voters={filteredVoters} onStatusChange={handleStatusChange} />
+              </div>
+            </div>
+          )}
+          {activeTab === 'users' && currentUser.role === 'admin' && <UserManagement />}
+          {activeTab === 'results' && currentUser.role === 'admin' && <ElectionResults voters={allVoters} />}
         </div>
       )}
     </div>

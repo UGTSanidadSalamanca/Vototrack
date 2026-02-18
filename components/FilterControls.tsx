@@ -52,7 +52,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
             <CardContent className="p-4 space-y-4">
                 <Input
                     type="text"
-                    placeholder="Buscar por nombre, apellido, email o teléfono..."
+                    placeholder="Buscar por Nombre, Apellidos o DNI (ej: 2754)..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -69,7 +69,7 @@ const FilterControls: React.FC<FilterControlsProps> = ({
                     </Select>
                     <Select value={centerFilter} onChange={(e) => setCenterFilter(e.target.value)} disabled={user.role === 'mesa'}>
                         {votingCenters.map(center => (
-                            <option key={center} value={center}>{center === 'todos' ? 'Todos los Centros' : center}</option>
+                            <option key={center} value={center}>{center === 'todos' ? 'Todos los Filtros' : center}</option>
                         ))}
                     </Select>
                 </div>

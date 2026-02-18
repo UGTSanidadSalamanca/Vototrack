@@ -1,6 +1,7 @@
 
 export interface Voter {
   id: number;
+  dni: string;
   nombre: string;
   apellido: string;
   apellido2: string;

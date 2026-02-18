@@ -1,43 +1,50 @@
 
 import { User, Voter } from '../types';
 
-export const VOTING_CENTERS = ['Hospital Clínico', 'Montalvos', 'Hospital Béjar', 'Primaria', 'Emergencias', 'Fibsal'];
+export const VOTING_CENTERS = [
+  'Hospital Clínico', 
+  'Primaria', 
+  'Montalvos', 
+  'Hospital Béjar'
+];
+
+export const VOTING_TABLES = [
+  'MESA 1', 'MESA 2', 'MESA 3', 'MESA 4', 'MESA 5', 'MESA 6', 
+  'MESA 7', 'MESA 8', 'MESA 9'
+];
+
+// Función auxiliar para determinar el centro basado en la mesa
+const getCenterFromMesa = (mesa: string): string => {
+  const m = mesa.toUpperCase().trim();
+  if (['MESA 1', 'MESA 2', 'MESA 3', 'MESA 4', 'MESA 5', 'MESA 6'].includes(m)) return 'Hospital Clínico';
+  if (m === 'MESA 7') return 'Primaria';
+  if (m === 'MESA 8') return 'Montalvos';
+  if (m === 'MESA 9') return 'Hospital Béjar';
+  return 'No asignado';
+};
 
 export const mockUsers: User[] = [
-  { username: 'admin', password: 'password', role: 'admin', center: 'Todos' },
-  { username: 'mesa1', password: 'password', role: 'mesa', center: 'Hospital Clínico' }
+  { username: 'admin', password: 'password', role: 'admin', center: 'Todos' }
 ];
 
 export const mockVoters: Voter[] = [
   {
     id: 1,
-    nombre: 'JUAN',
-    apellido: 'GARCIA',
-    apellido2: 'LOPEZ',
-    telefono: '600111222',
-    email: 'juan.garcia@saludcastillayleon.es',
-    afiliadoUGT: true,
+    dni: '***2754**',
+    nombre: 'ELVIRA',
+    apellido: 'ABAD',
+    apellido2: 'CAÑIBANO',
+    telefono: '',
+    email: '',
+    afiliadoUGT: false,
     haVotado: false,
     horaVoto: null,
     centroVotacion: 'Hospital Clínico',
-    mesaVotacion: 'Mesa A'
-  },
-  {
-    id: 2,
-    nombre: 'MARIA',
-    apellido: 'RODRIGUEZ',
-    apellido2: 'PÉREZ',
-    telefono: '611222333',
-    email: 'm.rodriguez@saludcastillayleon.es',
-    afiliadoUGT: false,
-    haVotado: true,
-    horaVoto: '10:15',
-    centroVotacion: 'Montalvos',
-    mesaVotacion: 'Mesa B'
+    mesaVotacion: 'MESA 1'
   }
 ];
 
-const API_URL = "https://script.google.com/macros/s/AKfycbz0i7LAhiMDU3FZEahkU9wt_SjcYPQVeJvTQ356R00BQdEz2PzpdNfnAYbA_t4ZUeBZ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzePI4kH7k3uaMeq-dyi8g4rVgqGp7E26phVtSt8qyMWJf7_o3x4JDFkMUHEk7Am00h/exec";
 
 export const voterService = {
   getVoters: async (): Promise<Voter[]> => {
@@ -48,26 +55,33 @@ export const voterService = {
       });
       
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
       const data = await response.json();
       
       if (Array.isArray(data)) {
-        // Saneamiento profundo para evitar errores de búsqueda
+        // FILTRO CRÍTICO: Eliminamos filas donde el ID no sea un número o el nombre esté vacío
         return data
-          .filter(v => v && typeof v === 'object')
-          .map((v: any) => ({
-            id: Number(v.id || 0),
-            nombre: String(v.nombre || ""),
-            apellido: String(v.apellido || ""),
-            apellido2: String(v.apellido2 || ""),
-            telefono: String(v.telefono || ""),
-            email: String(v.email || ""),
-            afiliadoUGT: v.afiliadoUGT === true || String(v.afiliadoUGT).toLowerCase() === "true",
-            haVotado: v.haVotado === true || String(v.haVotado).toLowerCase() === "true",
-            horaVoto: v.horaVoto ? String(v.horaVoto) : null,
-            centroVotacion: String(v.centroVotacion || "No asignado"),
-            mesaVotacion: String(v.mesaVotacion || "Sin mesa")
-          }));
+          .filter((v: any) => v.id && !isNaN(Number(v.id)) && String(v.nombre || "").trim() !== "")
+          .map((v: any) => {
+            const mesa = String(v.mesaVotacion || "").trim();
+            const centro = v.centroVotacion && String(v.centroVotacion).trim() !== "" 
+              ? String(v.centroVotacion).trim() 
+              : getCenterFromMesa(mesa);
+
+            return {
+              id: Number(v.id),
+              dni: String(v.dni || ""),
+              nombre: String(v.nombre || "").toUpperCase(),
+              apellido: String(v.apellido || "").toUpperCase(),
+              apellido2: String(v.apellido2 || "").toUpperCase(),
+              telefono: String(v.telefono || ""),
+              email: String(v.email || ""),
+              afiliadoUGT: String(v.afiliadoUGT).toLowerCase().includes("afiliado") || String(v.afiliadoUGT).toLowerCase() === "true",
+              haVotado: String(v.haVotado).toUpperCase() === "TRUE",
+              horaVoto: v.horaVoto ? String(v.horaVoto) : null,
+              centroVotacion: centro,
+              mesaVotacion: mesa
+            };
+          });
       }
       return mockVoters;
     } catch (error) {
@@ -77,34 +91,26 @@ export const voterService = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    const userMap = new Map<string, User>();
-    mockUsers.forEach(u => userMap.set(u.username.toLowerCase(), u));
-
     try {
-      const savedUsers = window.localStorage.getItem('voto-track-managed-users');
-      if (savedUsers) {
-        const parsedUsers = JSON.parse(savedUsers);
-        if (Array.isArray(parsedUsers)) {
-          parsedUsers.forEach(u => {
-            if (u && typeof u.username === 'string') userMap.set(u.username.toLowerCase(), u);
-          });
-        }
-      }
-    } catch (e) { console.error(e); }
-
-    try {
-      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, { method: 'GET', redirect: 'follow' });
+      const response = await fetch(`${API_URL}?action=getUsers&t=${Date.now()}`, { 
+        method: 'GET', 
+        redirect: 'follow' 
+      });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
-          data.forEach(u => {
-            if (u && typeof u.username === 'string') userMap.set(u.username.toLowerCase(), u);
-          });
+          return data
+            .filter((u: any) => u.username && String(u.username).trim() !== "")
+            .map(u => ({
+              username: String(u.username || ""),
+              password: String(u.password || ""),
+              role: String(u.role).toLowerCase() === 'admin' ? 'admin' : 'mesa',
+              center: String(u.center || "Todos")
+            }));
         }
       }
     } catch (error) { console.warn(error); }
-
-    return Array.from(userMap.values());
+    return mockUsers;
   },
 
   updateVoterStatus: async (voterId: number, hasVoted: boolean): Promise<{ success: boolean; horaVoto: string | null }> => {
@@ -119,18 +125,10 @@ export const voterService = {
       });
       return { success: true, horaVoto: hora };
     } catch (error) {
-      console.error(error);
       return { success: false, horaVoto: null };
     }
   },
 
-  sendReminder: async (voterId: number) => {
-    alert(`Recordatorio enviado al votante ID: ${voterId}`);
-    return { success: true };
-  },
-
-  sendMassReminder: async (voterIds: number[]) => {
-    alert(`Recordatorio masivo enviado a ${voterIds.length} afiliados.`);
-    return { success: true };
-  }
+  sendReminder: async (voterId: number) => { return { success: true }; },
+  sendMassReminder: async (voterIds: number[]) => { return { success: true }; }
 };
