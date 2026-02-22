@@ -29,7 +29,7 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
         };
     });
 
-    const [simData, setSimData] = useState<ElectionData & { totalCensus: number }>(() => {
+    const [simData, setSimData] = useState<ElectionData & { totalCensus: number, manualTotalVotes?: number }>(() => {
         const saved = localStorage.getItem('voto-track-sim-results');
         if (saved) return JSON.parse(saved);
         return {
@@ -50,7 +50,13 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
     const totalCensus = mode === 'real' ? (voters.length || 7300) : simData.totalCensus; 
     const manualVotesSum = currentData.blankVotes + currentData.nullVotes + currentData.unionVotes.reduce((acc, v) => acc + v.votes, 0);
     
-    const votesInBox = participationSource === 'app' && mode === 'real' ? appTurnout : manualVotesSum;
+    const votesInBox = useMemo(() => {
+        if (mode === 'real') {
+            return participationSource === 'app' ? appTurnout : manualVotesSum;
+        }
+        return simData.manualTotalVotes !== undefined ? simData.manualTotalVotes : manualVotesSum;
+    }, [mode, participationSource, appTurnout, manualVotesSum, simData.manualTotalVotes]);
+
     const participationRate = totalCensus > 0 ? (votesInBox / totalCensus) * 100 : 0;
 
     const handleVoteChange = (union: string | null, value: string) => {
@@ -88,6 +94,15 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
     const handleCensusChange = (value: string) => {
         const numValue = Math.max(1, parseInt(value) || 1);
         setSimData(prev => ({ ...prev, totalCensus: numValue }));
+    };
+
+    const handleManualTotalVotesChange = (value: string) => {
+        const numValue = Math.max(0, parseInt(value) || 0);
+        setSimData(prev => ({ ...prev, manualTotalVotes: numValue }));
+    };
+
+    const handleSyncTotalVotes = () => {
+        setSimData(prev => ({ ...prev, manualTotalVotes: undefined }));
     };
 
     const handleSave = () => {
@@ -224,7 +239,28 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                         <CardContent className="p-5 text-center">
                             <div className="flex flex-col items-center">
                                 <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${mode === 'real' ? 'text-primary' : 'text-amber-500'}`}>Votos Emitidos</p>
-                                <p className="text-4xl font-black">{votesInBox}</p>
+                                
+                                {mode === 'real' ? (
+                                    <p className="text-4xl font-black">{votesInBox}</p>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Input 
+                                            type="number" 
+                                            value={votesInBox} 
+                                            onChange={(e) => handleManualTotalVotesChange(e.target.value)}
+                                            className="text-3xl font-black bg-transparent border-none text-center w-32 h-12 focus-visible:ring-0 p-0"
+                                        />
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={handleSyncTotalVotes}
+                                            className="h-8 w-8 text-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
+                                            title="Sincronizar con suma de votos"
+                                        >
+                                            <RotateCcw className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                )}
                                 
                                 {mode === 'real' && (
                                     <div className="flex mt-3 bg-black/20 p-0.5 rounded-lg border border-white/5 no-print">
