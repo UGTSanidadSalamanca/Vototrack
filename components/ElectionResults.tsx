@@ -5,26 +5,15 @@ import { Input } from './ui/Input';
 import { Button } from './ui/Button';
 import { UNIONS, calculateElectionResults } from '../lib/electionUtils';
 import { ElectionData, Voter } from '../types';
-import { BarChart3, Save, RotateCcw, CheckCircle2, AlertTriangle, Printer, FileDown, ShieldCheck, Settings2 } from 'lucide-react';
+import { BarChart3, Save, RotateCcw, CheckCircle2, AlertTriangle, Printer, FileDown, ShieldCheck, Settings2, Calculator, Info } from 'lucide-react';
 
 interface ElectionResultsProps {
     voters: Voter[];
 }
 
 const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
-    const DEFAULT_VOTES = {
-        'UGT': 0,
-        'CCOO': 0,
-        'CSIF': 0,
-        'CGT': 0,
-        'SATSE': 0,
-        'SAE': 0,
-        'TCAE CAUSA': 0,
-        'CEMS': 0,
-        'CTS': 0,
-        'SINGEFE': 0
-    };
-
+    const [mode, setMode] = useState<'real' | 'sim'>('real');
+    
     const [electionData, setElectionData] = useState<ElectionData>(() => {
         const saved = localStorage.getItem('voto-track-election-results');
         if (saved) return JSON.parse(saved);
@@ -40,44 +29,104 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
         };
     });
 
-    const results = useMemo(() => calculateElectionResults(electionData, electionData.totalSeats), [electionData]);
+    const [simData, setSimData] = useState<ElectionData & { totalCensus: number }>(() => {
+        const saved = localStorage.getItem('voto-track-sim-results');
+        if (saved) return JSON.parse(saved);
+        return {
+            blankVotes: 0,
+            nullVotes: 0,
+            totalSeats: 35,
+            totalCensus: voters.length || 7300,
+            unionVotes: UNIONS.map(u => ({ union: u, votes: 0 }))
+        };
+    });
+
+    const [participationSource, setParticipationSource] = useState<'app' | 'manual'>('app');
     
-    // Ahora usamos el censo real pasado por props, o un mínimo de 1 para evitar división por cero
-    const totalCensus = voters.length || 7300; 
-    const votesInBox = electionData.blankVotes + electionData.nullVotes + electionData.unionVotes.reduce((acc, v) => acc + v.votes, 0);
+    const currentData = mode === 'real' ? electionData : simData;
+    const results = useMemo(() => calculateElectionResults(currentData, currentData.totalSeats), [currentData, mode]);
+    
+    const appTurnout = voters.filter(v => v.haVotado).length;
+    const totalCensus = mode === 'real' ? (voters.length || 7300) : simData.totalCensus; 
+    const manualVotesSum = currentData.blankVotes + currentData.nullVotes + currentData.unionVotes.reduce((acc, v) => acc + v.votes, 0);
+    
+    const votesInBox = participationSource === 'app' && mode === 'real' ? appTurnout : manualVotesSum;
     const participationRate = totalCensus > 0 ? (votesInBox / totalCensus) * 100 : 0;
 
     const handleVoteChange = (union: string | null, value: string) => {
         const numValue = Math.max(0, parseInt(value) || 0);
-        setElectionData(prev => {
-            if (union === null) return { ...prev, blankVotes: numValue };
-            if (union === 'null') return { ...prev, nullVotes: numValue };
-            return {
-                ...prev,
-                unionVotes: prev.unionVotes.map(uv => uv.union === union ? { ...uv, votes: numValue } : uv)
-            };
-        });
+        if (mode === 'real') {
+            setElectionData(prev => {
+                if (union === null) return { ...prev, blankVotes: numValue };
+                if (union === 'null') return { ...prev, nullVotes: numValue };
+                return {
+                    ...prev,
+                    unionVotes: prev.unionVotes.map(uv => uv.union === union ? { ...uv, votes: numValue } : uv)
+                };
+            });
+        } else {
+            setSimData(prev => {
+                if (union === null) return { ...prev, blankVotes: numValue };
+                if (union === 'null') return { ...prev, nullVotes: numValue };
+                return {
+                    ...prev,
+                    unionVotes: prev.unionVotes.map(uv => uv.union === union ? { ...uv, votes: numValue } : uv)
+                };
+            });
+        }
     };
 
     const handleSeatsChange = (value: string) => {
         const numValue = Math.max(1, parseInt(value) || 1);
-        setElectionData(prev => ({ ...prev, totalSeats: numValue }));
+        if (mode === 'real') {
+            setElectionData(prev => ({ ...prev, totalSeats: numValue }));
+        } else {
+            setSimData(prev => ({ ...prev, totalSeats: numValue }));
+        }
+    };
+
+    const handleCensusChange = (value: string) => {
+        const numValue = Math.max(1, parseInt(value) || 1);
+        setSimData(prev => ({ ...prev, totalCensus: numValue }));
     };
 
     const handleSave = () => {
-        localStorage.setItem('voto-track-election-results', JSON.stringify(electionData));
-        alert('Datos de escrutinio guardados.');
+        if (mode === 'real') {
+            localStorage.setItem('voto-track-election-results', JSON.stringify(electionData));
+            alert('Datos de escrutinio REAL guardados.');
+        } else {
+            localStorage.setItem('voto-track-sim-results', JSON.stringify(simData));
+            alert('Simulación guardada.');
+        }
     };
 
     const handleReset = () => {
-        if(confirm('¿Seguro que quieres borrar todos los datos?')) {
-            setElectionData({
-                blankVotes: 0,
-                nullVotes: 0,
-                totalSeats: 35,
-                unionVotes: UNIONS.map(u => ({ union: u, votes: 0 }))
-            });
+        if(confirm(`¿Seguro que quieres borrar todos los datos del modo ${mode === 'real' ? 'REAL' : 'SIMULADOR'}?`)) {
+            if (mode === 'real') {
+                setElectionData({
+                    blankVotes: 0,
+                    nullVotes: 0,
+                    totalSeats: 35,
+                    unionVotes: UNIONS.map(u => ({ union: u, votes: 0 }))
+                });
+            } else {
+                setSimData({
+                    blankVotes: 0,
+                    nullVotes: 0,
+                    totalSeats: 35,
+                    totalCensus: voters.length || 7300,
+                    unionVotes: UNIONS.map(u => ({ union: u, votes: 0 }))
+                });
+            }
         }
+    };
+
+    const handleLoadRealToSim = () => {
+        setSimData({
+            ...electionData,
+            totalCensus: voters.length || 7300
+        });
+        alert('Datos reales cargados en el simulador.');
     };
 
     const handlePrint = () => { window.print(); };
@@ -111,12 +160,34 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
 
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print bg-white/5 p-5 rounded-2xl border border-white/10 shadow-2xl backdrop-blur-md">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/20 rounded-xl">
-                        <ShieldCheck className="text-primary w-8 h-8" />
+                    <div className={`p-3 rounded-xl transition-colors ${mode === 'real' ? 'bg-primary/20' : 'bg-amber-500/20'}`}>
+                        {mode === 'real' ? <ShieldCheck className="text-primary w-8 h-8" /> : <Calculator className="text-amber-500 w-8 h-8" />}
                     </div>
                     <div>
-                        <h2 className="text-2xl font-black text-white tracking-tight">Escrutinio Profesional</h2>
-                        <p className="text-gray-400 text-sm">Cálculo proporcional por Restos Mayores</p>
+                        <h2 className="text-2xl font-black text-white tracking-tight">
+                            {mode === 'real' ? 'Escrutinio Profesional' : 'Calculadora de Escaños'}
+                        </h2>
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                                <button 
+                                    onClick={() => setMode('real')}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${mode === 'real' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                                >
+                                    Real
+                                </button>
+                                <button 
+                                    onClick={() => setMode('sim')}
+                                    className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${mode === 'sim' ? 'bg-amber-500 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                                >
+                                    Simulador
+                                </button>
+                            </div>
+                            {mode === 'sim' && (
+                                <Button variant="ghost" size="sm" onClick={handleLoadRealToSim} className="h-7 text-[10px] font-bold text-amber-500 hover:bg-amber-500/10 border border-amber-500/20">
+                                    <RotateCcw className="w-3 h-3 mr-1" /> Cargar Datos Reales
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -149,10 +220,32 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="bg-primary/5 border-primary/20 kpi-card">
+                    <Card className={`${mode === 'real' ? 'bg-primary/5 border-primary/20' : 'bg-amber-500/5 border-amber-500/20'} kpi-card relative overflow-hidden`}>
                         <CardContent className="p-5 text-center">
-                            <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Votos Emitidos</p>
-                            <p className="text-4xl font-black">{votesInBox}</p>
+                            <div className="flex flex-col items-center">
+                                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${mode === 'real' ? 'text-primary' : 'text-amber-500'}`}>Votos Emitidos</p>
+                                <p className="text-4xl font-black">{votesInBox}</p>
+                                
+                                {mode === 'real' && (
+                                    <div className="flex mt-3 bg-black/20 p-0.5 rounded-lg border border-white/5 no-print">
+                                        <button 
+                                            onClick={() => setParticipationSource('app')}
+                                            className={`px-2 py-1 rounded-md text-[8px] font-bold uppercase transition-all ${participationSource === 'app' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                        >
+                                            App
+                                        </button>
+                                        <button 
+                                            onClick={() => setParticipationSource('manual')}
+                                            className={`px-2 py-1 rounded-md text-[8px] font-bold uppercase transition-all ${participationSource === 'manual' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                        >
+                                            Manual
+                                        </button>
+                                    </div>
+                                )}
+                                {mode === 'real' && participationSource === 'manual' && appTurnout !== manualVotesSum && (
+                                    <p className="text-[8px] text-gray-500 mt-1 font-bold">App: {appTurnout}</p>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                     <Card className="bg-accent/5 border-accent/20 kpi-card">
@@ -164,7 +257,7 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                     <Card className="bg-white/5 border-white/10 kpi-card">
                         <CardContent className="p-5 text-center">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Delegados a Elegir</p>
-                            <p className="text-4xl font-black text-white print:text-black">{electionData.totalSeats}</p>
+                            <p className="text-4xl font-black text-white print:text-black">{currentData.totalSeats}</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -179,14 +272,27 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-5">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-gray-400 uppercase">Número Total de Delegados</label>
-                                    <Input 
-                                        type="number" 
-                                        className="font-black border-primary/30 bg-primary/5 text-primary text-lg h-12" 
-                                        value={electionData.totalSeats} 
-                                        onChange={(e) => handleSeatsChange(e.target.value)} 
-                                    />
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Delegados</label>
+                                        <Input 
+                                            type="number" 
+                                            className={`font-black text-lg h-12 ${mode === 'real' ? 'border-primary/30 bg-primary/5 text-primary' : 'border-amber-500/30 bg-amber-500/5 text-amber-500'}`} 
+                                            value={currentData.totalSeats} 
+                                            onChange={(e) => handleSeatsChange(e.target.value)} 
+                                        />
+                                    </div>
+                                    {mode === 'sim' && (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase">Censo para Simulación</label>
+                                            <Input 
+                                                type="number" 
+                                                className="font-black border-white/10 bg-white/5 text-white text-lg h-12" 
+                                                value={simData.totalCensus} 
+                                                onChange={(e) => handleCensusChange(e.target.value)} 
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -197,11 +303,17 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                             </CardHeader>
                             <CardContent className="pt-6 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <Input placeholder="Blanco" type="number" value={electionData.blankVotes} onChange={(e) => handleVoteChange(null, e.target.value)} />
-                                    <Input placeholder="Nulo" type="number" value={electionData.nullVotes} onChange={(e) => handleVoteChange('null', e.target.value)} />
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold text-gray-500 uppercase ml-1">Blanco</label>
+                                        <Input type="number" value={currentData.blankVotes} onChange={(e) => handleVoteChange(null, e.target.value)} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-bold text-gray-500 uppercase ml-1">Nulo</label>
+                                        <Input type="number" value={currentData.nullVotes} onChange={(e) => handleVoteChange('null', e.target.value)} />
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 pt-4 border-t border-white/5">
-                                    {electionData.unionVotes.map(uv => (
+                                    {currentData.unionVotes.map(uv => (
                                         <div key={uv.union} className="flex items-center justify-between gap-2">
                                             <span className="text-[10px] font-bold text-gray-300 truncate">{uv.union}</span>
                                             <Input type="number" className="w-20 h-8 text-right text-xs" value={uv.votes} onChange={(e) => handleVoteChange(uv.union, e.target.value)} />
@@ -209,7 +321,9 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                     ))}
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button className="flex-1" onClick={handleSave}><Save className="w-4 h-4 mr-2" /> Guardar</Button>
+                                    <Button className={`flex-1 ${mode === 'sim' ? 'bg-amber-500 hover:bg-amber-600' : ''}`} onClick={handleSave}>
+                                        <Save className="w-4 h-4 mr-2" /> {mode === 'real' ? 'Guardar' : 'Guardar Sim'}
+                                    </Button>
                                     <Button variant="outline" onClick={handleReset}><RotateCcw className="w-4 h-4" /></Button>
                                 </div>
                             </CardContent>
@@ -249,9 +363,17 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                     <span>{electionData.blankVotes + electionData.unionVotes.reduce((acc, v) => acc + v.votes, 0)}</span>
                                 </div>
                                 <div className="flex justify-between text-white print:text-black mt-1">
-                                    <span>Censo Real:</span>
+                                    <span>{mode === 'real' ? 'Censo Real:' : 'Censo Simulado:'}</span>
                                     <span>{totalCensus}</span>
                                 </div>
+                                {mode === 'sim' && (
+                                    <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded flex items-start gap-2">
+                                        <Info className="w-3 h-3 text-amber-500 mt-0.5" />
+                                        <p className="text-[9px] text-amber-200/70 leading-tight">
+                                            Estás en modo simulador. Los cambios aquí no afectan a los datos reales de la elección.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
