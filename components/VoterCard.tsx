@@ -4,7 +4,7 @@ import { AccordionItem, AccordionTrigger, AccordionContent } from './ui/Accordio
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { voterService } from '../lib/data';
-import { ThumbsUp, ThumbsDown, Send, Mail, Phone, MapPin } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Send, Mail, Phone, MapPin, Layout } from 'lucide-react';
 
 interface VoterCardProps {
     voter: Voter;
@@ -43,6 +43,10 @@ const VoterCard: React.FC<VoterCardProps> = ({ voter, onStatusChange }) => {
                          <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-primary" />
                             <span>{voter.centroVotacion}</span>
+                        </div>
+                         <div className="flex items-center gap-2">
+                            <Layout className="w-4 h-4 text-primary" />
+                            <span>Mesa: {voter.mesaVotacion}</span>
                         </div>
                         {voter.haVotado && voter.horaVoto && (
                              <div className="flex items-center gap-2">
