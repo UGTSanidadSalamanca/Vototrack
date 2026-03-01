@@ -5,7 +5,20 @@ import { Input } from './ui/Input';
 import { Button } from './ui/Button';
 import { UNIONS, calculateElectionResults } from '../lib/electionUtils';
 import { ElectionData, Voter } from '../types';
-import { BarChart3, Save, RotateCcw, CheckCircle2, AlertTriangle, Printer, FileDown, ShieldCheck, Settings2, Calculator, Info } from 'lucide-react';
+import { BarChart3, Save, RotateCcw, CheckCircle2, AlertTriangle, Printer, FileDown, ShieldCheck, Settings2, Calculator, Info, PieChart as PieChartIcon } from 'lucide-react';
+import { 
+    BarChart, 
+    Bar, 
+    XAxis, 
+    YAxis, 
+    CartesianGrid, 
+    Tooltip, 
+    ResponsiveContainer, 
+    Cell,
+    PieChart,
+    Pie,
+    Legend
+} from 'recharts';
 
 interface ElectionResultsProps {
     voters: Voter[];
@@ -16,7 +29,15 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
     
     const [electionData, setElectionData] = useState<ElectionData>(() => {
         const saved = localStorage.getItem('voto-track-election-results');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+            const data = JSON.parse(saved);
+            // Sincronizar con UNIONS actuales para evitar inconsistencias si el censo de siglas cambia
+            const syncedUnionVotes = UNIONS.map(u => {
+                const existing = data.unionVotes.find((uv: any) => uv.union === u);
+                return existing || { union: u, votes: 0 };
+            });
+            return { ...data, unionVotes: syncedUnionVotes };
+        }
         
         return {
             blankVotes: 0,
@@ -31,7 +52,15 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
 
     const [simData, setSimData] = useState<ElectionData & { totalCensus: number, manualTotalVotes?: number }>(() => {
         const saved = localStorage.getItem('voto-track-sim-results');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+            const data = JSON.parse(saved);
+            // Sincronizar con UNIONS actuales
+            const syncedUnionVotes = UNIONS.map(u => {
+                const existing = data.unionVotes.find((uv: any) => uv.union === u);
+                return existing || { union: u, votes: 0 };
+            });
+            return { ...data, unionVotes: syncedUnionVotes };
+        }
         return {
             blankVotes: 0,
             nullVotes: 0,
@@ -146,6 +175,23 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
 
     const handlePrint = () => { window.print(); };
 
+    const COLORS = [
+        '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
+        '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6'
+    ];
+
+    const chartData = useMemo(() => {
+        return results
+            .filter(r => r.votes > 0)
+            .sort((a, b) => b.votes - a.votes)
+            .map((r, index) => ({
+                name: r.union,
+                votes: r.votes,
+                seats: r.finalSeats,
+                color: COLORS[index % COLORS.length]
+            }));
+    }, [results]);
+
     const handleExportCSV = () => {
         const headers = ["Sindicato", "Votos", "Porcentaje", "Delegados"];
         const rows = results.map(r => [r.union, r.votes, `${r.percentage.toFixed(2)}%`, r.finalSeats]);
@@ -169,6 +215,9 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                     .kpi-card { background-color: #f8fafc !important; border: 1.5pt solid #e2e8f0 !important; color: black !important; }
                     .distribution-bar { height: 14mm !important; border: 1px solid #cbd5e1 !important; margin: 4mm 0 !important; border-radius: 6px !important; }
                     .text-primary { color: #2563eb !important; }
+                    .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: #e2e8f0 !important; }
+                    .recharts-text { fill: #64748b !important; font-weight: bold !important; }
+                    .recharts-legend-item-text { color: #1e293b !important; font-weight: bold !important; }
                 }
                 .print-only { display: none; }
             `}} />
@@ -216,7 +265,12 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
             </div>
 
             <div className="report-container space-y-6">
-                <div className="print-only border-b-4 border-blue-600 pb-5 mb-8">
+                <div className="print-only border-b-4 border-blue-600 pb-5 mb-8 relative overflow-hidden">
+                    {mode === 'sim' && (
+                        <div className="absolute top-0 right-0 transform rotate-12 translate-x-8 -translate-y-2 opacity-10 pointer-events-none">
+                            <p className="text-6xl font-black text-blue-900 border-4 border-blue-900 px-4 py-2">SIMULACIÓN</p>
+                        </div>
+                    )}
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -224,11 +278,15 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                             </div>
                             <div>
                                 <h1 className="text-3xl font-black text-blue-900 tracking-tighter leading-none">VotoTrack PRO</h1>
-                                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.3em] mt-1">Acta de Escrutinio Provisional</p>
+                                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-[0.3em] mt-1">
+                                    {mode === 'real' ? 'Acta de Escrutinio Provisional' : 'INFORME DE SIMULACIÓN / CALCULADORA'}
+                                </p>
                             </div>
                         </div>
                         <div className="text-right text-xs">
-                            <p className="font-black text-slate-900 text-sm mb-1">JUNTA DE PERSONAL - SACYL</p>
+                            <p className="font-black text-slate-900 text-sm mb-1">
+                                {mode === 'real' ? 'JUNTA DE PERSONAL - SACYL' : 'ESCENARIO DE SIMULACIÓN'}
+                            </p>
                             <p className="text-slate-500 font-medium italic">{new Date().toLocaleDateString('es-ES')}</p>
                         </div>
                     </div>
@@ -244,21 +302,26 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                     <p className="text-4xl font-black">{votesInBox}</p>
                                 ) : (
                                     <div className="flex items-center gap-2">
-                                        <Input 
-                                            type="number" 
-                                            value={votesInBox} 
-                                            onChange={(e) => handleManualTotalVotesChange(e.target.value)}
-                                            className="text-3xl font-black bg-transparent border-none text-center w-32 h-12 focus-visible:ring-0 p-0"
-                                        />
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            onClick={handleSyncTotalVotes}
-                                            className="h-8 w-8 text-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
-                                            title="Sincronizar con suma de votos"
-                                        >
-                                            <RotateCcw className="w-4 h-4" />
-                                        </Button>
+                                        <div className="print:block hidden">
+                                            <p className="text-4xl font-black text-black">{votesInBox}</p>
+                                        </div>
+                                        <div className="no-print flex items-center gap-2">
+                                            <Input 
+                                                type="number" 
+                                                value={votesInBox} 
+                                                onChange={(e) => handleManualTotalVotesChange(e.target.value)}
+                                                className="text-3xl font-black bg-transparent border-none text-center w-32 h-12 focus-visible:ring-0 p-0"
+                                            />
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                onClick={handleSyncTotalVotes}
+                                                className="h-8 w-8 text-amber-500/50 hover:text-amber-500 hover:bg-amber-500/10"
+                                                title="Sincronizar con suma de votos"
+                                            >
+                                                <RotateCcw className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                                 
@@ -348,11 +411,16 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                         <Input type="number" value={currentData.nullVotes} onChange={(e) => handleVoteChange('null', e.target.value)} />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-x-6 gap-y-2 pt-4 border-t border-white/5">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-4 border-t border-white/5">
                                     {currentData.unionVotes.map(uv => (
-                                        <div key={uv.union} className="flex items-center justify-between gap-2">
-                                            <span className="text-[10px] font-bold text-gray-300 truncate">{uv.union}</span>
-                                            <Input type="number" className="w-20 h-8 text-right text-xs" value={uv.votes} onChange={(e) => handleVoteChange(uv.union, e.target.value)} />
+                                        <div key={uv.union} className="flex items-center gap-2 group">
+                                            <span className="text-[11px] font-black text-gray-200 flex-1 leading-none tracking-tight">{uv.union}</span>
+                                            <Input 
+                                                type="number" 
+                                                className="w-14 h-8 text-right text-xs bg-white/5 border-white/10 focus:border-primary/50 transition-colors" 
+                                                value={uv.votes} 
+                                                onChange={(e) => handleVoteChange(uv.union, e.target.value)} 
+                                            />
                                         </div>
                                     ))}
                                 </div>
@@ -411,6 +479,92 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                     </div>
                                 )}
                             </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
+                    <Card className="border-white/10 shadow-xl bg-card overflow-hidden">
+                        <CardHeader className="bg-white/5 border-b border-white/5 py-4">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-primary" />
+                                Distribución de Votos
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-6 h-[300px]">
+                            {chartData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                                        <XAxis 
+                                            dataKey="name" 
+                                            stroke="#888" 
+                                            fontSize={10} 
+                                            tickLine={false} 
+                                            axisLine={false}
+                                        />
+                                        <YAxis 
+                                            stroke="#888" 
+                                            fontSize={10} 
+                                            tickLine={false} 
+                                            axisLine={false}
+                                            tickFormatter={(value) => `${value}`}
+                                        />
+                                        <Tooltip 
+                                            contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '8px', fontSize: '12px' }}
+                                            itemStyle={{ color: '#fff' }}
+                                        />
+                                        <Bar dataKey="votes" radius={[4, 4, 0, 0]}>
+                                            {chartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-500 text-sm italic">
+                                    No hay votos registrados para mostrar el gráfico
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-white/10 shadow-xl bg-card overflow-hidden">
+                        <CardHeader className="bg-white/5 border-b border-white/5 py-4">
+                            <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                <PieChartIcon className="w-4 h-4 text-accent" />
+                                Reparto de Delegados
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-6 h-[300px]">
+                            {chartData.filter(d => d.seats > 0).length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={chartData.filter(d => d.seats > 0)}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="seats"
+                                            label={({ name, seats }) => `${name}: ${seats}`}
+                                        >
+                                            {chartData.filter(d => d.seats > 0).map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip 
+                                            contentStyle={{ backgroundColor: '#111', border: '1px solid #333', borderRadius: '8px', fontSize: '12px' }}
+                                        />
+                                        <Legend verticalAlign="bottom" height={36}/>
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-500 text-sm italic">
+                                    No hay delegados asignados para mostrar el gráfico
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

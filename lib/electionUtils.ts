@@ -2,7 +2,7 @@
 import { ElectionData, ElectionCalculation } from '../types';
 
 export const UNIONS = [
-  'UGT', 'CCOO', 'CSIF', 'CGT', 'SATSE', 'SAE', 'TCAE CAUSA', 'CEMS', 'CTS', 'SINGEFE'
+  'UGT', 'CCOO', 'CEMS', 'CGT', 'CSIF', 'SATSE', 'TYSCYL', 'USO', 'SINGEFE'
 ];
 
 export const calculateElectionResults = (data: ElectionData, totalSeats: number = 35): ElectionCalculation[] => {
