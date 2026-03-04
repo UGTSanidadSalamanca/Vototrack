@@ -62,11 +62,24 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
             return { ...data, unionVotes: syncedUnionVotes };
         }
         return {
-            blankVotes: 0,
-            nullVotes: 0,
-            totalSeats: 35,
-            totalCensus: voters.length || 7300,
-            unionVotes: UNIONS.map(u => ({ union: u, votes: 0 }))
+            blankVotes: 6,
+            nullVotes: 5,
+            totalSeats: 31,
+            totalCensus: 7086,
+            manualTotalVotes: 3000,
+            unionVotes: UNIONS.map(u => {
+                const defaults: Record<string, number> = {
+                    'SATSE': 550,
+                    'CCOO': 450,
+                    'CSIF': 420,
+                    'UGT': 330,
+                    'CGT': 220,
+                    'TYSCYL': 180,
+                    'USO': 180,
+                    'SINGEFE': 150
+                };
+                return { union: u, votes: defaults[u] || 0 };
+            })
         };
     });
 
@@ -155,11 +168,24 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                 });
             } else {
                 setSimData({
-                    blankVotes: 0,
-                    nullVotes: 0,
-                    totalSeats: 35,
-                    totalCensus: voters.length || 7300,
-                    unionVotes: UNIONS.map(u => ({ union: u, votes: 0 }))
+                    blankVotes: 6,
+                    nullVotes: 5,
+                    totalSeats: 31,
+                    totalCensus: 7086,
+                    manualTotalVotes: 3000,
+                    unionVotes: UNIONS.map(u => {
+                        const defaults: Record<string, number> = {
+                            'SATSE': 550,
+                            'CCOO': 450,
+                            'CSIF': 420,
+                            'UGT': 330,
+                            'CGT': 220,
+                            'TYSCYL': 180,
+                            'USO': 180,
+                            'SINGEFE': 150
+                        };
+                        return { union: u, votes: defaults[u] || 0 };
+                    })
                 });
             }
         }
@@ -400,13 +426,13 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                                         <Input type="number" value={currentData.nullVotes} onChange={(e) => handleVoteChange('null', e.target.value)} />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-4 border-t border-white/5">
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-4 border-t border-white/5">
                                     {currentData.unionVotes.map(uv => (
-                                        <div key={uv.union} className="flex items-center gap-2 group">
-                                            <span className="text-[11px] font-black text-gray-200 flex-1 leading-none tracking-tight">{uv.union}</span>
+                                        <div key={uv.union} className="flex items-center gap-3 group">
+                                            <span className="text-[11px] font-black text-gray-200 flex-1 leading-none tracking-tight whitespace-nowrap">{uv.union}</span>
                                             <Input 
                                                 type="number" 
-                                                className="w-14 h-8 text-right text-xs bg-white/5 border-white/10 focus:border-primary/50 transition-colors" 
+                                                className="w-20 h-8 text-right text-xs bg-white/5 border-white/10 focus:border-primary/50 transition-colors" 
                                                 value={uv.votes} 
                                                 onChange={(e) => handleVoteChange(uv.union, e.target.value)} 
                                             />
