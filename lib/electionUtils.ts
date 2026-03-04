@@ -24,38 +24,40 @@ export const calculateElectionResults = (data: ElectionData, totalSeats: number 
     };
   });
 
-  const admittedUnions = results.filter(r => !r.excluded);
-  const admittedVotesTotal = admittedUnions.reduce((acc, curr) => acc + curr.votes, 0);
+  const admittedUnions = results.filter(r => !r.excluded && r.votes > 0);
+  
+  if (admittedUnions.length === 0 || totalSeats <= 0) return results;
 
-  if (admittedVotesTotal === 0) return results;
+  // 2. Sistema D'Hondt
+  // Creamos una lista de todos los posibles cocientes
+  interface Quotient {
+    union: string;
+    value: number;
+  }
 
-  // 2. Reparto por Cociente
-  const quotient = admittedVotesTotal / totalSeats;
-  let allocatedSeats = 0;
-
-  results = results.map(r => {
-    if (r.excluded) return r;
-    const seats = Math.floor(r.votes / quotient);
-    const remainder = r.votes % quotient;
-    allocatedSeats += seats;
-    return { ...r, initialSeats: seats, finalSeats: seats, remainder };
+  const allQuotients: Quotient[] = [];
+  
+  admittedUnions.forEach(union => {
+    for (let i = 1; i <= totalSeats; i++) {
+      allQuotients.push({
+        union: union.union,
+        value: union.votes / i
+      });
+    }
   });
 
-  // 3. Reparto por Restos Mayores
-  let remainingSeats = totalSeats - allocatedSeats;
-  
-  if (remainingSeats > 0) {
-    const sortedByRemainder = [...results]
-        .filter(r => !r.excluded)
-        .sort((a, b) => b.remainder - a.remainder);
+  // Ordenamos los cocientes de mayor a menor
+  allQuotients.sort((a, b) => b.value - a.value);
 
-    for (let i = 0; i < remainingSeats && i < sortedByRemainder.length; i++) {
-        const unionToUpdate = sortedByRemainder[i].union;
-        results = results.map(r => 
-            r.union === unionToUpdate ? { ...r, finalSeats: r.finalSeats + 1 } : r
-        );
-    }
-  }
+  // Tomamos los primeros 'totalSeats' cocientes
+  const winningQuotients = allQuotients.slice(0, totalSeats);
+
+  // Contamos cuántos delegados le corresponden a cada sindicato
+  results = results.map(r => {
+    if (r.excluded) return r;
+    const seats = winningQuotients.filter(q => q.union === r.union).length;
+    return { ...r, finalSeats: seats, initialSeats: seats };
+  });
 
   return results;
 };

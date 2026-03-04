@@ -478,9 +478,15 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
                             </table>
                             <div className="mt-4 pt-4 border-t border-white/5 text-[10px] font-bold text-gray-500">
                                 <div className="flex justify-between">
-                                    <span>Votos Válidos:</span>
-                                    <span>{electionData.blankVotes + electionData.unionVotes.reduce((acc, v) => acc + v.votes, 0)}</span>
+                                    <span>Votos Válidos (Escrutados):</span>
+                                    <span>{currentData.blankVotes + currentData.unionVotes.reduce((acc, v) => acc + v.votes, 0)}</span>
                                 </div>
+                                {mode === 'sim' && (
+                                    <div className="flex justify-between text-gray-400">
+                                        <span>Votos Válidos (Caja):</span>
+                                        <span>{votesInBox - currentData.nullVotes}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-white print:text-black mt-1">
                                     <span>{mode === 'real' ? 'Censo Real:' : 'Censo Simulado:'}</span>
                                     <span>{totalCensus}</span>
