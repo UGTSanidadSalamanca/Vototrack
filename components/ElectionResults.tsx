@@ -363,44 +363,33 @@ const ElectionResults: React.FC<ElectionResultsProps> = ({ voters }) => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 results-grid">
                     <div className="space-y-6 no-print">
-                        <Card className="border-white/10 shadow-xl bg-card overflow-hidden">
+                        <Card className="border-white/10 shadow-xl bg-card">
                             <CardHeader className="bg-white/5 border-b border-white/5 py-4">
-                                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                    <Settings2 className="w-4 h-4 text-primary" />
-                                    Configuración
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="pt-5">
-                                <div className="grid grid-cols-1 gap-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Delegados</label>
+                                <CardTitle className="text-sm font-bold flex items-center justify-between">
+                                    <span>Votos y Configuración</span>
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Delegados:</label>
                                         <Input 
                                             type="number" 
-                                            className={`font-black text-lg h-12 ${mode === 'real' ? 'border-primary/30 bg-primary/5 text-primary' : 'border-amber-500/30 bg-amber-500/5 text-amber-500'}`} 
+                                            className={`w-16 h-7 font-black text-center text-xs ${mode === 'real' ? 'border-primary/30 bg-primary/5 text-primary' : 'border-amber-500/30 bg-amber-500/5 text-amber-500'}`} 
                                             value={currentData.totalSeats} 
                                             onChange={(e) => handleSeatsChange(e.target.value)} 
                                         />
                                     </div>
-                                    {mode === 'sim' && (
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-bold text-gray-400 uppercase">Censo para Simulación</label>
-                                            <Input 
-                                                type="number" 
-                                                className="font-black border-white/10 bg-white/5 text-white text-lg h-12" 
-                                                value={simData.totalCensus} 
-                                                onChange={(e) => handleCensusChange(e.target.value)} 
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="border-white/10 shadow-xl bg-card">
-                            <CardHeader className="bg-white/5 border-b border-white/5 py-4">
-                                <CardTitle className="text-sm font-bold">Votos</CardTitle>
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-6 space-y-4">
+                                {mode === 'sim' && (
+                                    <div className="pb-4 border-b border-white/5 space-y-1.5">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase">Censo para Simulación</label>
+                                        <Input 
+                                            type="number" 
+                                            className="font-black border-white/10 bg-white/5 text-white text-sm h-10" 
+                                            value={simData.totalCensus} 
+                                            onChange={(e) => handleCensusChange(e.target.value)} 
+                                        />
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-[9px] font-bold text-gray-500 uppercase ml-1">Blanco</label>
